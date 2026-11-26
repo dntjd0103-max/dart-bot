@@ -1,29 +1,41 @@
-name: DART Auto Bot
+name: DART 내부자 매수 알림
 
 on:
   schedule:
-    # 매일 한국 시간 오후 5시 (영국 UTC 기준 08:00) 자동 실행
-    - cron: '0 8 * * *'
-  workflow_dispatch: # 버튼을 눌러 직접 수동 실행 가능하도록 설정
+    - cron: "17 10 * * 1-5"   # 평일 한국시간 19:17 (그날 공시가 거의 다 올라온 뒤)
+  workflow_dispatch:          # Actions 탭에서 직접 실행 가능
+    inputs:
+      date:
+        description: "날짜 (YYYYMMDD, 비우면 오늘)"
+        required: false
+
+permissions:
+  contents: write
 
 jobs:
-  run-bot:
+  alert:
     runs-on: ubuntu-latest
     steps:
-      - name: 코드 가져오기
-        uses: actions/checkout@v4
-
-      - name: 파이썬 설정
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-
-      - name: 패키지 설치
-        run: pip install requests
-
-      - name: 파이썬 코드 실행
+          python-version: "3.11"
+      - run: pip install requests
+      - name: Run
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python main.py
+        run: |
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            python main.py --date "${{ github.event.inputs.date }}"
+          else
+            python main.py
+          fi
+      - name: Save log
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "Update alerts log"
+          git push
